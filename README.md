@@ -1,4 +1,4 @@
-# Death Indicators
+# Death Indicators (IDK WHY I CALLED THEM INDICATORS AND IM TOO LAZY TO CHANGE IT NOW)
 
 Super Mario Maker death markers in gd.
 
