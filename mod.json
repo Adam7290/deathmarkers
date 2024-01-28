@@ -1,0 +1,21 @@
+{
+	"geode": "2.0.0-beta.11",
+	"gd": "2.204",
+	"version": "v1.0.0",
+	"id": "adam_729.deathindicators",
+	"name": "deathindicators",
+	"developer": "Adam_729",
+	"description": "super mario maker like indicators",
+	"resources": {
+		"sprites": [
+			"resources/death-indicator.png"
+		]
+	},
+	"settings": {
+		"enable-indicators": {
+			"name": "Enable Death Indicators",
+			"type": "bool",
+			"default": true
+		}
+	}
+}
