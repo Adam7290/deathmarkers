@@ -16,6 +16,16 @@
 			"name": "Enable Death Indicators",
 			"type": "bool",
 			"default": true
+		},
+		"show-practice": {
+			"name": "Show in Practice",
+			"type": "bool",
+			"default": false
+		},
+		"show-testmode": {
+			"name": "Show in Testmode",
+			"type": "bool",
+			"default": false
 		}
 	}
 }
