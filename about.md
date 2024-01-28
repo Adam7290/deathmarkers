@@ -1,3 +1,3 @@
-# Template Mod
+# Death Indicators
 
-Edit about.md to change this
+Super Mario Maker death indicators in gd.

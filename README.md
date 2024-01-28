@@ -1,3 +1,3 @@
-# deathindicators
+# Death Indicators
 
-This is where she makes a mod.
+Super Mario Maker death indicators in gd.
