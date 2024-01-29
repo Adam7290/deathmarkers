@@ -1,0 +1,212 @@
+name: Build Geode mod
+description: Builds a Geode mod
+
+inputs:
+  sdk:
+    description: Which version of the SDK to use, defaults to latest release. Set to 'nightly' for latest commit, 'latest' for latest release
+    required: false
+    default: latest
+  cli:
+    description: Which CLI version to use, defaults to latest release.
+    required: false
+    default: latest
+  configure-args:
+    description: Extra arguments passed to CMake when configuring.
+    required: false
+    default: ""
+  build-args:
+    description: Extra arguments passed to CMake when building.
+    required: false
+    default: ""
+  build-config:
+    description: Which build configuration to use. Defaults to Release
+    required: false
+    default: Release
+  path:
+    description: Path to the project which to build. Defaults to current directory.
+    required: false
+    default: ./
+  combine:
+    description: Set this to true if you plan on merging .geode files later. See the README for more info.
+    required: false
+    default: false
+  target:
+    description: Geode target to build for. Can be either "Win32", "MacOS", "Android32" or "Android64".
+    required: false
+    default: ""
+  bindings:
+    description: What repository to use for bindings. Must be in the format "user/repo"
+    required: false
+    default: "geode-sdk/bindings"
+  bindings-ref:
+    description: Which commit/branch to use for bindings. Defaults to latest commit in main branch
+    required: false
+    default: ""
+  android-min-sdk:
+    description: The android min SDK version to target. Defaults to 23
+    required: false
+    default: 23
+
+outputs:
+  build-output:
+    description: A folder containing the built .geode file(s)
+    value: ${{ steps.build.outputs.output }}
+
+runs:
+  using: composite
+  steps:
+    - name: Detect platform
+      id: platform
+      shell: bash
+      run: |
+        DEFAULT_TARGET=Win32
+        if [ "$RUNNER_OS" = "Linux" ]; then
+          ID=linux
+          DEFAULT_TARGET=Android32
+        elif [ "$RUNNER_OS" = "Windows" ]; then
+          ID=win
+          DEFAULT_TARGET=Win32
+        elif [ "$RUNNER_OS" = "macOS" ]; then
+          ID=mac
+          DEFAULT_TARGET=MacOS
+        fi
+        
+        TARGET=${{ inputs.target }}
+        if [ "$TARGET" = "" ]; then
+          TARGET=$DEFAULT_TARGET
+        fi
+
+        if [ "$TARGET" = "Android32" ]; then
+          OUTPUT_ID=android32
+        elif [ "$TARGET" = "Android64" ]; then
+          OUTPUT_ID=android64
+        elif [ "$TARGET" = "Win32" ]; then
+          OUTPUT_ID=win
+        elif [ "$TARGET" = "MacOS" ]; then
+          OUTPUT_ID=mac
+        fi
+        
+        echo "id=$ID" >> $GITHUB_OUTPUT
+        echo "target=$TARGET" >> $GITHUB_OUTPUT
+        echo "target_id=$OUTPUT_ID" >> $GITHUB_OUTPUT
+
+    - uses: ilammy/msvc-dev-cmd@v1
+      with:
+        arch: x86
+
+    - name: Setup NDK
+      uses: nttld/setup-ndk@v1
+      id: setup-ndk
+      with:
+        ndk-version: r26b
+        add-to-path: false
+      if: inputs.target == 'Android32' || inputs.target == 'Android64'
+
+    - name: Setup Android Env
+      shell: bash
+      run: |
+        echo "NDK_HOME=${{ steps.setup-ndk.outputs.ndk-path }}" >> "$GITHUB_ENV"
+        sudo apt install ninja-build
+      if: inputs.target == 'Android32' || inputs.target == 'Android64'
+
+    - name: Download bindings repo
+      if: inputs.bindings != 'geode-sdk/bindings' || inputs.bindings-ref != ''
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.bindings }}
+        ref: ${{ inputs.bindings-ref }}
+        path: bindings-repo
+
+    - name: Setup bindings enviroment
+      if: inputs.bindings != 'geode-sdk/bindings' || inputs.bindings-ref != ''
+      shell: bash
+      run: echo "GEODE_BINDINGS_REPO_PATH=$GITHUB_WORKSPACE/bindings-repo" >> $GITHUB_ENV
+        
+    - name: Download CLI
+      uses: robinraju/release-downloader@v1.8
+      with:
+        repository: geode-sdk/cli
+        latest: ${{ inputs.cli == 'latest' }}
+        tag: ${{ inputs.cli != 'latest' && inputs.cli || '' }}
+        tarBall: false
+        zipBall: false
+        fileName: "*-${{ steps.platform.outputs.id }}.zip"
+        extract: true
+        out-file-path: ${{ github.action_path }}
+
+    - run: echo "${{ github.action_path }}" >> $GITHUB_PATH
+      shell: bash
+    
+    - name: Setup CLI
+      shell: bash
+      run: |
+        if [ ${{ steps.platform.outputs.id }} != "win" ]; then
+          chmod +x "${{ github.action_path }}/geode"
+        fi
+
+        export CLI_PROFILE="${{ github.action_path }}/cli-profile"
+        # for windows
+        mkdir -p "$CLI_PROFILE/geode/mods"
+        # for mac
+        mkdir -p "$CLI_PROFILE/Contents/geode/mods"
+        geode profile add --name GithubActions "$CLI_PROFILE"
+
+        geode sdk install "${{ github.action_path }}/geode-sdk-clone"
+        
+        # silly github actions wont refresh the env
+        export GEODE_SDK="${{ github.action_path }}/geode-sdk-clone"
+        echo "GEODE_SDK=$GEODE_SDK" >> $GITHUB_ENV
+
+        if [ "${{ inputs.sdk }}" == "latest" ]; then
+          SDK_VERSION=stable
+        else
+          SDK_VERSION=${{ inputs.sdk }}
+        fi
+        geode sdk update $SDK_VERSION
+        geode sdk install-binaries --platform ${{ steps.platform.outputs.target_id }}
+
+        export CPM_CACHE="${{ github.action_path }}/cpm-cache"
+        echo "CPM_SOURCE_CACHE=$CPM_CACHE" >> $GITHUB_ENV
+
+
+    - name: Run CMake and build
+      id: build
+      shell: bash
+      run: |
+        mkdir -p $HOME/.cache
+        
+        cd "${{ inputs.path }}"
+        if [ ${{ steps.platform.outputs.id }} = "win" ]; then
+          CMAKE_EXTRA_ARGS="-T host=x64 -A win32"
+        elif [ ${{ steps.platform.outputs.id }} = "mac" ]; then
+          CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-config }} -DCMAKE_OSX_DEPLOYMENT_TARGET=10.13"
+        elif [ ${{ steps.platform.outputs.target }} = "Android32" ]; then
+          CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-config }} -DCMAKE_TOOLCHAIN_FILE=$NDK_HOME/build/cmake/android.toolchain.cmake -DANDROID_ABI=armeabi-v7a -DANDROID_PLATFORM=android-${{ inputs.android-min-sdk }} -DGEODE_DONT_BUILD_TEST_MODS=1 -G Ninja"
+        elif [ ${{ steps.platform.outputs.target }} = "Android64" ]; then
+          CMAKE_EXTRA_ARGS="-DCMAKE_BUILD_TYPE=${{ inputs.build-config }} -DCMAKE_TOOLCHAIN_FILE=$NDK_HOME/build/cmake/android.toolchain.cmake -DANDROID_ABI=arm64-v8a -DANDROID_PLATFORM=android-${{ inputs.android-min-sdk }} -DGEODE_DONT_BUILD_TEST_MODS=1 -G Ninja"
+        fi
+        cmake -B build $CMAKE_EXTRA_ARGS -DGEODE_DONT_INSTALL_MODS=On -DGEODE_TARGET_PLATFORM=${{ steps.platform.outputs.target }} ${{ inputs.configure-args }}
+        cmake --build build --config ${{ inputs.build-config }} ${{ inputs.build-args }}
+
+        mkdir "${{ github.action_path }}/output"
+        
+        for file in $(find ./build -name *.geode); do
+          cp $file "${{ github.action_path }}/output"
+        done
+
+        OUTPUT_DIR="${{ github.action_path }}/output"
+        if [ ${{ steps.platform.outputs.id }} = "mac" ]; then
+          OUTPUT_DIR=$(python3 -c 'import os, sys; print(os.path.realpath(sys.argv[1]))' "$OUTPUT_DIR")
+        elif [ ${{ steps.platform.outputs.id }} = "win" ]; then
+          OUTPUT_DIR=$(cygpath -wa "$OUTPUT_DIR")
+        else
+          OUTPUT_DIR=$(realpath "$OUTPUT_DIR")
+        fi
+        echo "output=$OUTPUT_DIR" >> $GITHUB_OUTPUT
+    
+    - name: Upload artifacts
+      if: ${{ inputs.combine }}
+      uses: actions/upload-artifact@v3
+      with:
+        name: "geode-build-${{ steps.platform.outputs.target_id }}"
+        path: "${{ steps.build.outputs.output }}/*.geode"
