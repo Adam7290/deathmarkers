@@ -1,6 +1,11 @@
 name: Build Geode mod
 description: Builds a Geode mod
 
+on:
+  push:
+    branches:
+      - main
+
 inputs:
   sdk:
     description: Which version of the SDK to use, defaults to latest release. Set to 'nightly' for latest commit, 'latest' for latest release
