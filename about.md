@@ -1,3 +1,3 @@
-# Death Indicators
+# Death Markers
 
-Super Mario Maker death indicators in gd.
+Super Mario Maker death markers in gd.

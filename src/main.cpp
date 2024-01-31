@@ -116,13 +116,11 @@ bool isEnabled() {
 		return false;
 	}
 
-	// Until m_isTestMode is in the bindings this is how im gonna do this
-	// This probably isnt the best way of doing this and will probably break next update
-	if (*(bool*)(&playLayer->m_isPracticeMode + 48) && !Mod::get()->getSettingValue<bool>("show-testmode")) {
+	if (playLayer->m_isTestMode && !Mod::get()->getSettingValue<bool>("show-testmode")) {
 		return false;
 	}
 
-	return Mod::get()->getSettingValue<bool>("enable-indicators");
+	return Mod::get()->getSettingValue<bool>("enable-markers");
 }
 
 class $modify(ModifiedPlayLayer, PlayLayer) {
@@ -149,14 +147,6 @@ class $modify(ModifiedPlayLayer, PlayLayer) {
 	}
 
 	void onQuit() {
-		/* 
-		// since m_inTestMode isnt in the 2.2 GJBaseGameLayer bindings i have to brute force
-		// (im a noobie and this is the only way i know how lmao)
-		for (int i = 1; i <= 211; i++) {
-			log::debug("tm + {}: {}", i, (*(bool*)(&m_isPracticeMode + i)) == true);
-		}
-		*/
-
 		PlayLayer::onQuit();
 		saveDeathPoints(this->m_level, m_fields->m_deathPoints);
 	}
@@ -191,7 +181,7 @@ class $modify(ModifiedPlayerObject, PlayerObject) {
 				bool thisDeath = idx == 0;
 
 				if (shouldRender(point, this)) {
-					auto sprite = CCSprite::create("death-indicator.png"_spr);
+					auto sprite = CCSprite::create("death-marker.png"_spr);
 					sprite->setScale(thisDeath ? 0.8f : 0.5f);
 					sprite->setAnchorPoint({0.5f, 0.0f});
 					if (thisDeath) sprite->setZOrder(99999);
