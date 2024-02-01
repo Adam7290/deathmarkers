@@ -167,6 +167,7 @@ class $modify(ModifiedPlayerObject, PlayerObject) {
 		}
 
 		auto game = GameManager::get();
+		auto mod = Mod::get();
 		auto playLayer = static_cast<ModifiedPlayLayer*>(game->getPlayLayer());
 		if (playLayer) { // If player died in play layer not in the editor or main menu
 			auto& deathPoints = playLayer->m_fields->m_deathPoints;
@@ -176,42 +177,54 @@ class $modify(ModifiedPlayerObject, PlayerObject) {
 			int idx = 0;
 			float totalTime = 0.0f;
 
+			bool animateMarkers = mod->getSettingValue<bool>("animate-markers");
+			double markerScale = mod->getSettingValue<double>("marker-scale");
+
 			for (auto iter = deathPoints.rbegin(); iter != deathPoints.rend(); iter++) {
 				auto point = *iter;
 				bool thisDeath = idx == 0;
 
 				if (shouldRender(point, this)) {
 					auto sprite = CCSprite::create("death-marker.png"_spr);
-					sprite->setScale(thisDeath ? 0.8f : 0.5f);
+					sprite->setScale(markerScale);
 					sprite->setAnchorPoint({0.5f, 0.0f});
-					if (thisDeath) sprite->setZOrder(99999);
 
-					// anim
-					sprite->setPosition(point + CCPoint(0.0f, 20.0f));
-					sprite->setOpacity(0);
-					sprite->runAction(CCSequence::createWithTwoActions(
-						CCDelayTime::create(idx * 0.01f),
-						CCSpawn::createWithTwoActions(
-							CCMoveTo::create(0.25f, point),
-							CCFadeIn::create(0.25f)
-						)
-					));
+					if (thisDeath) { 
+						sprite->setZOrder(99999);
+						sprite->setScale(sprite->getScale() * 1.6f);
+					}
 
-					// anim end
+					if (animateMarkers)
+					{
+						// anim
+						sprite->setPosition(point + CCPoint(0.0f, 20.0f));
+						sprite->setOpacity(0);
+						sprite->runAction(CCSequence::createWithTwoActions(
+							CCDelayTime::create(idx * 0.01f),
+							CCSpawn::createWithTwoActions(
+								CCMoveTo::create(0.25f, point),
+								CCFadeIn::create(0.25f)
+							)
+						));
+						totalTime += 0.01f;
+					} else {
+						sprite->setPosition(point);
+					}
 
 					deathSprites->addChild(sprite);
-					totalTime += 0.01f;
 					idx++;
 				}
 			}
 
-			totalTime += game->getGameVariable("0052") ? 1.0f : 2.0f; // Enable Faster Reset var
+			totalTime += mod->getSettingValue<double>("respawn-time");
 			log::info("DI TOTAL TIME: {}", totalTime);
 
-			deathSprites->runAction(CCSequence::createWithTwoActions(
-				CCDelayTime::create(totalTime),
-				CCCallFunc::create(this, callfunc_selector(ModifiedPlayerObject::onDIFinish))
-			));
+			if (game->getGameVariable("0026")) { // Auto retry var
+				deathSprites->runAction(CCSequence::createWithTwoActions(
+					CCDelayTime::create(totalTime),
+					CCCallFunc::create(this, callfunc_selector(ModifiedPlayerObject::onDIFinish))
+				));
+			}
 		}
 	}
 
