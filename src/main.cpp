@@ -5,6 +5,7 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
 #include <Geode/modify/GameLevelManager.hpp>
+#include <Geode/modify/CCScheduler.hpp> // DEBUGGING SOMETHING PLEASE REMEMBER TO REMOVE
 
 #include <fstream>
 #include <string>
@@ -15,17 +16,23 @@ using namespace geode::prelude;
 using DeathPoints = std::vector<CCPoint>;
 static_assert(sizeof(float) == 4); // Floats have to be 4 bytes for file format (i dont think this will ever error but just to be sure)
 
-bool shouldRender(CCPoint point, PlayerObject* plr) {
-	CCSize winSize = CCDirector::get()->getWinSize()/2;
-	float zoom = PlayLayer::get()->getScale();
-	float range = std::max(winSize.width, winSize.height);
-	return (point.getDistance(plr->getPosition()) / zoom) < range;
+// This function has caused me so much pain and suffering
+// For some reason robtop doesnt use a camera and instead translates the layer its self
+bool shouldRender(CCPoint point, CCNode* parentNode) {
+	auto winSize = CCDirector::get()->getWinSize();
+	auto globPos = parentNode->convertToWorldSpace(point);
+	
+	// I have no clue how to get the camera rotation so this is my shitty solution for now
+	float range = std::max(winSize.width, winSize.height) / 2;
+	return globPos.getDistance(winSize/2) < range;
+
+	//return globPos.x > 0 && globPos.y > 0 && globPos.x < winSize.width && globPos.y < winSize.height;
 }
 
 ghc::filesystem::path getFilePath(GJGameLevel* lvl) {
 	auto path = Mod::get()->getSaveDir();
 	int id = lvl->m_levelID.value();
-	if (id == 0) { // id is 0 when playtesting editor levels so just use level name since those have to be unique anyways
+	if (id == 0) { // id is 0 when playtesting editor levels
 		//path /= lvl->m_levelName.c_str();
 		path /= ("my" + std::to_string(lvl->m_M_ID)); // IDK WHAT M_ID IS BUT THIS SEEMS TO WORK FOR UNIQUE "MY LEVELS"
 	} else {
@@ -36,6 +43,7 @@ ghc::filesystem::path getFilePath(GJGameLevel* lvl) {
 }
 
 // SUUUPER basic file format
+// im probably gonna regret not adding a version to the file header but its too late now
 /*
 struct DIPoint {
 	float x, y;
@@ -158,9 +166,26 @@ class $modify(ModifiedPlayLayer, PlayLayer) {
 	}
 };
 
+class $modify(CCScheduler) {
+	void update(float dt) {
+		CCScheduler::update(dt);
+		auto playLayer = PlayLayer::get();
+		if (playLayer) {
+			auto plr = playLayer->m_player1;
+			if (plr) {
+				log::debug("SHOULD RENDER DEBUG: {}", shouldRender(plr->getPosition(), plr->getParent()));
+			}
+		}
+	}
+};
+
 class $modify(ModifiedPlayerObject, PlayerObject) {
-	void playerDestroyed(bool p0) {
-		PlayerObject::playerDestroyed(p0);
+	void playerDestroyed(bool secondPlr) {
+		PlayerObject::playerDestroyed(secondPlr);
+
+		if (secondPlr) {
+			return;
+		}
 
 		if (!isEnabled()) {
 			return;
@@ -184,7 +209,7 @@ class $modify(ModifiedPlayerObject, PlayerObject) {
 				auto point = *iter;
 				bool thisDeath = idx == 0;
 
-				if (shouldRender(point, this)) {
+				if (shouldRender(point, deathSprites)) {
 					auto sprite = CCSprite::create("death-marker.png"_spr);
 					sprite->setScale(markerScale);
 					sprite->setAnchorPoint({0.5f, 0.0f});
@@ -217,7 +242,7 @@ class $modify(ModifiedPlayerObject, PlayerObject) {
 			}
 
 			totalTime += mod->getSettingValue<double>("respawn-time");
-			log::info("DI TOTAL TIME: {}", totalTime);
+			//log::info("DI TOTAL TIME: {}", totalTime);
 
 			if (game->getGameVariable("0026")) { // Auto retry var
 				deathSprites->runAction(CCSequence::createWithTwoActions(
