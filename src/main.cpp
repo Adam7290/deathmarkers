@@ -5,7 +5,6 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
 #include <Geode/modify/GameLevelManager.hpp>
-#include <Geode/modify/CCScheduler.hpp> // DEBUGGING SOMETHING PLEASE REMEMBER TO REMOVE
 
 #include <fstream>
 #include <string>
@@ -162,19 +161,6 @@ class $modify(ModifiedPlayLayer, PlayLayer) {
 	void delayedResetLevel() { // Override the delayed reset
 		if (!isEnabled()) {
 			PlayLayer::delayedResetLevel();
-		}
-	}
-};
-
-class $modify(CCScheduler) {
-	void update(float dt) {
-		CCScheduler::update(dt);
-		auto playLayer = PlayLayer::get();
-		if (playLayer) {
-			auto plr = playLayer->m_player1;
-			if (plr) {
-				log::debug("SHOULD RENDER DEBUG: {}", shouldRender(plr->getPosition(), plr->getParent()));
-			}
 		}
 	}
 };
