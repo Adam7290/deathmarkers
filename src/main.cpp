@@ -62,55 +62,49 @@ DeathPoints loadDeathPoints(GJGameLevel* lvl) {
 		return DeathPoints();
 	}
 
+	#define CHECKSTREAM(stmt) { stmt; if (!file.good()) { log::error("Failed to load DI file: {}", std::strerror(errno)); file.close(); return DeathPoints(); } }
 	std::ifstream file;
-	file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-	try {
-		file.open(path, std::ios::binary);
+	CHECKSTREAM(file.open(path, std::ios::binary));
 		
-		// Get length
-		uint32_t length;
-		file.read((char*)&length, sizeof(length));
+	// Get length
+	uint32_t length;
+	CHECKSTREAM(file.read((char*)&length, sizeof(length)));
 
-		constexpr size_t pointSize = sizeof(float)*2; // NOT CCPoint
-		DeathPoints points;
-		points.reserve(length);
+	constexpr size_t pointSize = sizeof(float)*2; // NOT CCPoint
+	DeathPoints points;
+	points.reserve(length);
 
-		for (size_t i = 0; i < length*pointSize; i += pointSize) {
-			float x, y;
-			file.read((char*)&x, sizeof(float));
-			file.read((char*)&y, sizeof(float));
-			points.emplace_back(x, y);
-		}
-
-		file.close();
-		return points;
-	} catch (std::ifstream::failure e) {
-		log::error("Failed to load DI file: {}", e.what());
-		return DeathPoints(); // return an empty array
+	for (size_t i = 0; i < length*pointSize; i += pointSize) {
+		float x, y;
+		CHECKSTREAM(file.read((char*)&x, sizeof(float))); 
+		CHECKSTREAM(file.read((char*)&y, sizeof(float)));
+		points.emplace_back(x, y);
 	}
+
+	file.close();
+	return points;
+
+	#undef CHECKSTREAM
 }
 
 void saveDeathPoints(GJGameLevel* lvl, const DeathPoints& deathPoints) {
 	auto path = getFilePath(lvl);
 
+	#define CHECKSTREAM(stmt) { stmt; if (!file.good()) { log::error("Failed to save DI file: {}", std::strerror(errno)); file.close(); return; } }
 	std::ofstream file;
-	file.exceptions(std::ifstream::failbit | std::ifstream::badbit);
-	try {
-		file.open(path, std::ios::binary | std::ios::trunc);
-		
-		// Write length
-		uint32_t length = deathPoints.size();
-		file.write((char*)&length, sizeof(uint32_t));
+	CHECKSTREAM(file.open(path, std::ios::binary | std::ios::trunc));
 
-		for (auto point : deathPoints) {
-			file.write((char*)&point.x, sizeof(float));
-			file.write((char*)&point.y, sizeof(float));
-		}
+	// Write length
+	uint32_t length = deathPoints.size();
+	CHECKSTREAM(file.write((char*)&length, sizeof(uint32_t)));
 
-		file.close();
-	} catch (std::ifstream::failure e) {
-		log::error("Failed to save DI file: {}", e.what());
+	for (auto point : deathPoints) {
+		CHECKSTREAM(file.write((char*)&point.x, sizeof(float)));
+		CHECKSTREAM(file.write((char*)&point.y, sizeof(float)));
 	}
+
+	file.close();
+	#undef CHECKSTREAM
 }
 
 bool isEnabled() {
@@ -159,7 +153,7 @@ class $modify(ModifiedPlayLayer, PlayLayer) {
 	}
 
 	void delayedResetLevel() { // Override the delayed reset
-		if (!isEnabled()) {
+		if (!isEnabled() || !Mod::get()->getSettingValue<bool>("override-respawn-time")) {
 			PlayLayer::delayedResetLevel();
 		}
 	}
@@ -230,7 +224,7 @@ class $modify(ModifiedPlayerObject, PlayerObject) {
 			totalTime += mod->getSettingValue<double>("respawn-time");
 			//log::info("DI TOTAL TIME: {}", totalTime);
 
-			if (game->getGameVariable("0026")) { // Auto retry var
+			if (game->getGameVariable("0026") && mod->getSettingValue<bool>("override-respawn-time")) { // Auto retry var
 				deathSprites->runAction(CCSequence::createWithTwoActions(
 					CCDelayTime::create(totalTime),
 					CCCallFunc::create(this, callfunc_selector(ModifiedPlayerObject::onDIFinish))

@@ -1,4 +1,8 @@
 ## Death Markers Changelog
+# v1.0.4
+- Added "Enable Respawn Time Override" setting
+- Removed C++ exceptions
+- Made (and stole) some alternate icons (check the github repo)
 # v1.0.3
 - New marker icon
 - Fixed death markers showing on both sides in dual/2 plr mode when only one icon crashes ([issue #2](https://github.com/Bean0of/deathmarkers/issues/2))
