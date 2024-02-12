@@ -5,6 +5,8 @@
 #include <Geode/modify/PlayLayer.hpp>
 #include <Geode/modify/PlayerObject.hpp>
 #include <Geode/modify/GameLevelManager.hpp>
+#include <Geode/modify/PauseLayer.hpp>
+#include <Geode/ui/GeodeUI.hpp>
 
 #include <fstream>
 #include <string>
@@ -113,15 +115,23 @@ bool isEnabled() {
 		return false; 
 	}
 
-	if (playLayer->m_isPracticeMode && !Mod::get()->getSettingValue<bool>("show-practice")) {
-		return false;
+	if (!Mod::get()->getSettingValue<bool>("enable-markers")) return false;
+
+	if (playLayer->m_level->isPlatformer()) {
+		if (!Mod::get()->getSettingValue<bool>("show-platformer")) return false;
+	} else {
+		if (!Mod::get()->getSettingValue<bool>("show-classic")) return false;
 	}
 
-	if (playLayer->m_isTestMode && !Mod::get()->getSettingValue<bool>("show-testmode")) {
-		return false;
+	if (playLayer->m_isPracticeMode) {
+		if (!Mod::get()->getSettingValue<bool>("show-practice")) return false;
+	} else if (playLayer->m_isTestMode) {
+		if (!Mod::get()->getSettingValue<bool>("show-testmode")) return false;
+	} else {
+		if (!Mod::get()->getSettingValue<bool>("show-normal")) return false;
 	}
 
-	return Mod::get()->getSettingValue<bool>("enable-markers");
+	return true;
 }
 
 class $modify(ModifiedPlayLayer, PlayLayer) {
@@ -246,5 +256,34 @@ class $modify(GameLevelManager) {
 		auto path = getFilePath(lvl);
 		GameLevelManager::deleteLevel(lvl);
 		ghc::filesystem::remove(path);
+	}
+};
+
+class $modify(ModifiedPauseLayer, PauseLayer) {
+	void customSetup() {
+		PauseLayer::customSetup();
+		if (Mod::get()->getSettingValue<bool>("pause-menu-options")) {
+			auto sprite = CCSprite::createWithSpriteFrameName("GJ_plainBtn_001.png");
+			sprite->setScale(0.6f);
+
+			auto icon = CCSprite::create("death-marker.png"_spr);
+			icon->setScale(0.95f);
+			icon->setPosition(sprite->getContentSize()/2);
+			sprite->addChild(icon);
+			
+			auto button = CCMenuItemSpriteExtra::create(
+				sprite, 
+				this, 
+				menu_selector(ModifiedPauseLayer::openDISettings)
+			);
+
+			auto menu = this->getChildByID("right-button-menu");
+			menu->addChild(button);
+			menu->updateLayout();
+		}
+	}	
+
+	void openDISettings(CCObject*) {
+		geode::openSettingsPopup(Mod::get());
 	}
 };

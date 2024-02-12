@@ -21,6 +21,26 @@
 			"type": "bool",
 			"default": true
 		},
+		"pause-menu-options": {
+			"name": "Pause Menu Options Button",
+			"type": "bool",
+			"default": true
+		},
+		"show-classic": {
+			"name": "Enable in Classic Mode",
+			"type": "bool",
+			"default": true
+		},
+		"show-platformer": {
+			"name": "Enable in Platformer Mode",
+			"type": "bool",
+			"default": true
+		},
+		"show-normal": {
+			"name": "Enable in Normal",
+			"type": "bool",
+			"default": true
+		},
 		"show-practice": {
 			"name": "Enable in Practice",
 			"type": "bool",
@@ -42,7 +62,7 @@
 			"default": true
 		},
 		"respawn-time": {
-			"name": "Respawn Time",
+			"name": "Respawn Time Override",
 			"description": "Time to fade in markers + respawn time",
 			"type": "float",
 			"default": 1.0,
