@@ -169,6 +169,7 @@ class $modify(ModifiedPlayLayer, PlayLayer) {
 	void delayedResetLevel() { // Override the delayed reset
 		if (!isEnabled()) {
 			PlayLayer::delayedResetLevel();
+			return;
 		}
 
 		if (m_fields->m_deathMarkerAnimTime > m_fields->m_respawnTimeSum) {
@@ -267,13 +268,6 @@ class $modify(ModifiedPlayerObject, PlayerObject) {
 			}
 
 			totalTime += mod->getSettingValue<double>("marker-time");
-		}
-	}
-
-	void onDIFinish() {
-		auto playLayer = PlayLayer::get();
-		if (playLayer) {
-			playLayer->resetLevel();
 		}
 	}
 };
