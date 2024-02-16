@@ -7,6 +7,7 @@
 #include <Geode/modify/GameLevelManager.hpp>
 #include <Geode/modify/PauseLayer.hpp>
 #include <Geode/ui/GeodeUI.hpp>
+#include <Geode/Loader.hpp>
 
 #include <fstream>
 #include <string>
@@ -16,6 +17,8 @@ using namespace geode::prelude;
 
 using DeathPoints = std::vector<CCPoint>;
 static_assert(sizeof(float) == 4); // Floats have to be 4 bytes for file format (i dont think this will ever error but just to be sure)
+
+const float MINIMUM_MARKER_SPEED = 0.1f; // minimum delay between each iteration when looping through visible markers
 
 // This function has caused me so much pain and suffering
 // For some reason robtop doesnt use a camera and instead translates the layer its self
@@ -137,6 +140,8 @@ bool isEnabled() {
 class $modify(ModifiedPlayLayer, PlayLayer) {
 	DeathPoints m_deathPoints;
 	CCNode* m_deathSprites;
+	float m_respawnTimeSum; // Hacky way to calc respawn time
+	float m_deathMarkerAnimTime;
 
 	bool init(GJGameLevel* p0, bool p1, bool p2) {
 		m_fields->m_deathSprites = CCNode::create();
@@ -145,7 +150,6 @@ class $modify(ModifiedPlayLayer, PlayLayer) {
 
 		m_fields->m_deathSprites->setZOrder(999999999);
 		this->m_objectLayer->addChild(m_fields->m_deathSprites);
-
 		m_fields->m_deathPoints = loadDeathPoints(this->m_level);
 
 		return true;
@@ -163,9 +167,22 @@ class $modify(ModifiedPlayLayer, PlayLayer) {
 	}
 
 	void delayedResetLevel() { // Override the delayed reset
-		if (!isEnabled() || !Mod::get()->getSettingValue<bool>("override-respawn-time")) {
+		if (!isEnabled()) {
 			PlayLayer::delayedResetLevel();
 		}
+
+		if (m_fields->m_deathMarkerAnimTime > m_fields->m_respawnTimeSum) {
+			m_fields->m_deathSprites->runAction(CCSequence::createWithTwoActions(
+				CCDelayTime::create(m_fields->m_deathMarkerAnimTime - m_fields->m_respawnTimeSum),
+				CCCallFunc::create(this, callfunc_selector(PlayLayer::resetLevel))
+			));
+		} else {
+			PlayLayer::resetLevel();
+		}
+	}
+
+	void updateCalcRespawnTime() {
+		m_fields->m_respawnTimeSum += CCDirector::get()->getDeltaTime();
 	}
 };
 
@@ -185,61 +202,71 @@ class $modify(ModifiedPlayerObject, PlayerObject) {
 		auto mod = Mod::get();
 		auto playLayer = static_cast<ModifiedPlayLayer*>(game->getPlayLayer());
 		if (playLayer) { // If player died in play layer not in the editor or main menu
+			playLayer->m_fields->m_respawnTimeSum = 0; // super hacky
+			playLayer->m_fields->m_deathSprites->runAction(
+				CCRepeatForever::create(CCSequence::createWithTwoActions(
+					CCDelayTime::create(0), 
+					CCCallFunc::create(playLayer, callfunc_selector(ModifiedPlayLayer::updateCalcRespawnTime)))
+				)
+			);
+
 			auto& deathPoints = playLayer->m_fields->m_deathPoints;
 			auto deathSprites = playLayer->m_fields->m_deathSprites;
 			deathPoints.push_back(this->getPosition());
 			
-			int idx = 0;
-			float totalTime = 0.0f;
+			float& totalTime = playLayer->m_fields->m_deathMarkerAnimTime;
+			totalTime = 0;
 
 			bool animateMarkers = mod->getSettingValue<bool>("animate-markers");
 			double markerScale = mod->getSettingValue<double>("marker-scale");
+			double markerScaleThisDeath = markerScale * mod->getSettingValue<double>("marker-scale-thisdeath");
 
+			DeathPoints visiblePoints; visiblePoints.reserve(deathPoints.size());
+			int thisDeathIdx = -1;
 			for (auto iter = deathPoints.rbegin(); iter != deathPoints.rend(); iter++) {
-				auto point = *iter;
-				bool thisDeath = idx == 0;
-
+				auto& point = *iter;
 				if (shouldRender(point, deathSprites)) {
-					auto sprite = CCSprite::create("death-marker.png"_spr);
-					sprite->setScale(markerScale);
-					sprite->setAnchorPoint({0.5f, 0.0f});
-
-					if (thisDeath) { 
-						sprite->setZOrder(99999);
-						sprite->setScale(sprite->getScale() * 1.6f);
+					if (std::distance(iter, deathPoints.rbegin()) == 0) {
+						thisDeathIdx = 0;
 					}
 
-					if (animateMarkers)
-					{
-						// anim
-						sprite->setPosition(point + CCPoint(0.0f, 20.0f));
-						sprite->setOpacity(0);
-						sprite->runAction(CCSequence::createWithTwoActions(
-							CCDelayTime::create(idx * 0.01f),
-							CCSpawn::createWithTwoActions(
-								CCMoveTo::create(0.25f, point),
-								CCFadeIn::create(0.25f)
-							)
-						));
-						totalTime += 0.01f;
-					} else {
-						sprite->setPosition(point);
-					}
-
-					deathSprites->addChild(sprite);
-					idx++;
+					visiblePoints.push_back(point);
 				}
 			}
 
-			totalTime += mod->getSettingValue<double>("respawn-time");
-			//log::info("DI TOTAL TIME: {}", totalTime);
+			int idx = 0;
+			float interval = mod->getSettingValue<double>("marker-anim-time") / visiblePoints.size();
+			for (auto& point : visiblePoints) {
+				auto sprite = CCSprite::create("death-marker.png"_spr);
+				sprite->setScale(markerScale);
+				sprite->setAnchorPoint({0.5f, 0.0f});
 
-			if (game->getGameVariable("0026") && mod->getSettingValue<bool>("override-respawn-time")) { // Auto retry var
-				deathSprites->runAction(CCSequence::createWithTwoActions(
-					CCDelayTime::create(totalTime),
-					CCCallFunc::create(this, callfunc_selector(ModifiedPlayerObject::onDIFinish))
-				));
+				if (idx == thisDeathIdx) {
+					sprite->setZOrder(99999);
+					sprite->setScale(markerScaleThisDeath);
+				}
+
+				if (animateMarkers)
+				{
+					sprite->setPosition(point + CCPoint(0.0f, 20.0f));
+					sprite->setOpacity(0);
+					sprite->runAction(CCSequence::createWithTwoActions(
+						CCDelayTime::create(idx * interval),
+						CCSpawn::createWithTwoActions(
+							CCMoveTo::create(0.25f, point),
+							CCFadeIn::create(0.25f)
+						)
+					));
+					totalTime += interval;
+				} else {
+					sprite->setPosition(point);
+				}
+
+				deathSprites->addChild(sprite);
+				idx++;
 			}
+
+			totalTime += mod->getSettingValue<double>("marker-time");
 		}
 	}
 
@@ -262,7 +289,7 @@ class $modify(GameLevelManager) {
 class $modify(ModifiedPauseLayer, PauseLayer) {
 	void customSetup() {
 		PauseLayer::customSetup();
-		if (Mod::get()->getSettingValue<bool>("pause-menu-options")) {
+		if (Mod::get()->getSettingValue<bool>("pause-menu-options") && Loader::get()->isModLoaded("geode.node-ids")) {
 			auto sprite = CCSprite::createWithSpriteFrameName("GJ_plainBtn_001.png");
 			sprite->setScale(0.6f);
 
