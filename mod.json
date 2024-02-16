@@ -19,13 +19,6 @@
 			"resources/death-marker.png"
 		]
 	},
-	"dependencies": [
-		{
-			"id": "geode.node-ids",
-			"version": ">=1.4.0",
-			"importance": "suggested"
-		}
-	],
 	"settings": {
 		"enable-markers": {
 			"name": "Enable Death Markers",
