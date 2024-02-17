@@ -175,10 +175,10 @@ class $modify(ModifiedPlayLayer, PlayLayer) {
 		if (m_fields->m_deathMarkerAnimTime > m_fields->m_respawnTimeSum) {
 			m_fields->m_deathSprites->runAction(CCSequence::createWithTwoActions(
 				CCDelayTime::create(m_fields->m_deathMarkerAnimTime - m_fields->m_respawnTimeSum),
-				CCCallFunc::create(this, callfunc_selector(PlayLayer::resetLevel))
+				CCCallFunc::create(this, callfunc_selector(PlayLayer::delayedResetLevel))
 			));
 		} else {
-			PlayLayer::resetLevel();
+			PlayLayer::delayedResetLevel();
 		}
 	}
 
