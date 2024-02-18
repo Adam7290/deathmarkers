@@ -64,3 +64,6 @@
 
 # Built Visual Studio Code Extensions
 *.vsix
+
+# Ignore test output files
+**/tests/output/*
