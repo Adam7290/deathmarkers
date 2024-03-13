@@ -188,6 +188,13 @@ class $modify(ModifiedPlayLayer, PlayLayer) {
 };
 
 class $modify(ModifiedPlayerObject, PlayerObject) {
+	static void onModify(auto& self) {
+		// Hook before QOLMod (-6969) hook that completely overrides playerDestroyed
+		if(!self.setHookPriority("PlayerObject::playerDestroyed", -6970)) {
+			log::error("Failed to set priority of PlayerObject::playerDestroyed to -6970 (somehow)");
+		}
+	}
+
 	void playerDestroyed(bool secondPlr) {
 		PlayerObject::playerDestroyed(secondPlr);
 
