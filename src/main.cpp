@@ -279,6 +279,7 @@ class $modify(ModifiedPlayerObject, PlayerObject) {
 	}
 };
 
+#ifndef GEODE_IS_MACOS
 class $modify(GameLevelManager) {
 	void deleteLevel(GJGameLevel* lvl) {
 		auto path = getFilePath(lvl);
@@ -286,6 +287,7 @@ class $modify(GameLevelManager) {
 		ghc::filesystem::remove(path);
 	}
 };
+#endif
 
 class $modify(ModifiedPauseLayer, PauseLayer) {
 	void customSetup() {
