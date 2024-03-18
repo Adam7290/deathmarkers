@@ -15,9 +15,9 @@ jobs:
         - name: Windows
           os: windows-latest
 
-      #   i dont have a mac
-      # - name: macOS
-      #   os: macos-latest
+      #   i dont have a mac (VM FINALLY WORKED)
+        - name: macOS
+          os: macos-latest
 
         - name: Android32
           os: ubuntu-latest
