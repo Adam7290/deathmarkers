@@ -1,5 +1,4 @@
 // My first gd mod
-// I dont usually make shit in C++ so sorry if this code is terrible (im a rust guy)
 
 #include <Geode/Geode.hpp>
 #include <Geode/modify/PlayLayer.hpp>
@@ -48,10 +47,11 @@ ghc::filesystem::path getFilePath(GJGameLevel* lvl) {
 
 // SUUUPER basic file format
 // im probably gonna regret not adding a version to the file header but its too late now
+// ^ I DEFINITELY DO :)
 /*
 struct DIPoint {
 	float x, y;
-}
+};
 
 struct DIFile {
 	uint32_t length;
