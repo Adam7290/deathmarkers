@@ -32,7 +32,7 @@ bool shouldRender(CCPoint point, CCNode* parentNode) {
 	//return globPos.x > 0 && globPos.y > 0 && globPos.x < winSize.width && globPos.y < winSize.height;
 }
 
-ghc::filesystem::path getFilePath(GJGameLevel* lvl) {
+std::filesystem::path getFilePath(GJGameLevel* lvl) {
 	auto path = Mod::get()->getSaveDir();
 	int id = lvl->m_levelID.value();
 	if (id == 0) { // id is 0 when playtesting editor levels
@@ -63,7 +63,7 @@ DeathPoints loadDeathPoints(GJGameLevel* lvl) {
 	auto path = getFilePath(lvl);
 
 	// Return an empty array if file doesnt exist
-	if (!ghc::filesystem::exists(path)) {
+	if (!std::filesystem::exists(path)) {
 		return DeathPoints();
 	}
 
@@ -138,10 +138,12 @@ bool isEnabled() {
 }
 
 class $modify(ModifiedPlayLayer, PlayLayer) {
-	DeathPoints m_deathPoints;
-	CCNode* m_deathSprites;
-	float m_respawnTimeSum; // Hacky way to calc respawn time
-	float m_deathMarkerAnimTime;
+	struct Fields {
+		DeathPoints m_deathPoints;
+		CCNode* m_deathSprites;
+		float m_respawnTimeSum; // Hacky way to calc respawn time
+		float m_deathMarkerAnimTime;
+	};
 
 	bool init(GJGameLevel* p0, bool p1, bool p2) {
 		m_fields->m_deathSprites = CCNode::create();
@@ -283,7 +285,7 @@ class $modify(GameLevelManager) {
 	void deleteLevel(GJGameLevel* lvl) {
 		auto path = getFilePath(lvl);
 		GameLevelManager::deleteLevel(lvl);
-		ghc::filesystem::remove(path);
+		std::filesystem::remove(path);
 	}
 };
 
